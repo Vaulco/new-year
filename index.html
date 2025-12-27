@@ -14,23 +14,13 @@
         }
         
         @keyframes bounce {
-            0%, 20%, 53%, 80%, 100% {
-                transform: translate3d(0,0,0);
-            }
-            40%, 43% {
-                transform: translate3d(0,-30px,0);
-            }
-            70% {
-                transform: translate3d(0,-15px,0);
-            }
-            90% {
-                transform: translate3d(0,-4px,0);
-            }
+            0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
+            40%, 43% { transform: translate3d(0,-30px,0); }
+            70% { transform: translate3d(0,-15px,0); }
+            90% { transform: translate3d(0,-4px,0); }
         }
         
-        .animate-bounce {
-            animation: bounce 1s infinite;
-        }
+        .animate-bounce { animation: bounce 1s infinite; }
     </style>
 </head>
 <body>
@@ -52,10 +42,17 @@
         </div>
     </div>
 
+    <!-- Audio element -->
+    <audio id="newYearMusic" src="vaulco.mp3"></audio>
+
     <script>
         let targetYear = new Date().getFullYear() + 1;
         let isComplete = false;
-        
+        const music = document.getElementById('newYearMusic');
+        music.started = false;
+        music.volume = 0; // start at 0 volume
+        let musicStartTime = null;
+
         function formatNumber(num, digits) {
             return num.toString().padStart(digits, '0');
         }
@@ -87,32 +84,43 @@
                 year: 'numeric'
             });
         }
-        
+
         function calculateTimeLeft() {
             const now = new Date();
             const targetDate = new Date(targetYear, 0, 1);
             const difference = targetDate.getTime() - now.getTime();
-            
+
             const countdownEl = document.getElementById('countdown');
             const celebrationEl = document.getElementById('celebration');
             const currentDateEl = document.getElementById('current-date');
             const currentTimeEl = document.getElementById('current-time');
-            
+
             // Update current time display
             currentDateEl.textContent = formatDateForFooter(now);
             currentTimeEl.textContent = formatTimeForFooter(now);
-            
+
+            // Start music before New Year based on its duration
+            const musicDuration = music.duration || 120;
+            if (difference <= musicDuration * 1000 && !music.started) {
+                music.volume = 0; // ensure starting at 0
+                console.log('Starting music with volume:', music.volume);
+                music.play();
+                music.started = true;
+                musicStartTime = Date.now();
+                console.log('Music started at:', musicStartTime);
+            }
+
             if (difference > 0) {
                 const days = Math.floor(difference / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
                 const minutes = Math.floor((difference / 1000 / 60) % 60);
                 const seconds = Math.floor((difference / 1000) % 60);
-                
+
                 const showDays = days > 0;
                 const showHours = showDays || hours > 0;
                 const showMinutes = showHours || minutes > 0;
                 const showSeconds = showMinutes || seconds > 0;
-                
+
                 let html = '';
                 html += createTimeUnit(days, 3, showDays);
                 html += createSeparator(showDays && showHours);
@@ -121,7 +129,7 @@
                 html += createTimeUnit(minutes, 2, showMinutes);
                 html += createSeparator(showMinutes && showSeconds);
                 html += createTimeUnit(seconds, 2, showSeconds);
-                
+
                 countdownEl.innerHTML = html;
                 countdownEl.classList.remove('hidden');
                 celebrationEl.classList.add('hidden');
@@ -131,17 +139,51 @@
                 celebrationEl.textContent = targetYear;
                 celebrationEl.classList.remove('hidden');
                 isComplete = true;
-                
+
                 setTimeout(() => {
                     targetYear = targetYear + 1;
                     isComplete = false;
+                    music.started = false;
+                    musicStartTime = null;
                 }, 3000);
             }
         }
-        
-        // Initialize and start the countdown
-        calculateTimeLeft();
-        setInterval(calculateTimeLeft, 1000);
+
+        // Smooth volume control function
+        function updateVolume() {
+            if (music.started && !music.paused && musicStartTime !== null) {
+                const now = new Date();
+                const targetDate = new Date(targetYear, 0, 1);
+                const difference = targetDate.getTime() - now.getTime();
+                
+                const timeSinceMusicStart = Date.now() - musicStartTime;
+                const fadeInDuration = 30000; // 10 seconds
+                const fadeOutDuration = 30000; // 10 seconds
+                
+                if (timeSinceMusicStart < fadeInDuration) {
+                    // Fade in from 0 to 1 over 10 seconds
+                    const newVolume = Math.min(1, timeSinceMusicStart / fadeInDuration);
+                    music.volume = newVolume;
+                    console.log('Fade in:', timeSinceMusicStart, 'ms, volume:', newVolume);
+                } else if (difference <= fadeOutDuration && difference > 0) {
+                    // Fade out from 1 to 0 in the last 10 seconds
+                    const newVolume = Math.max(0, difference / fadeOutDuration);
+                    music.volume = newVolume;
+                    console.log('Fade out:', difference, 'ms, volume:', newVolume);
+                } else if (difference > fadeOutDuration) {
+                    // Full volume in between
+                    music.volume = 1;
+                }
+            }
+            requestAnimationFrame(updateVolume);
+        }
+
+        // Wait until audio metadata is loaded to know duration
+        music.addEventListener('loadedmetadata', () => {
+            calculateTimeLeft();
+            setInterval(calculateTimeLeft, 1000);
+            updateVolume(); // Start the smooth volume update loop
+        });
     </script>
 </body>
 </html>
